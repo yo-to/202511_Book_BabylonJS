@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <title>Web Speech API 音声合成</title>
+  </head>
+  <body>
+    <input
+      id="text"
+      type="text"
+      size="40"
+      placeholder="読み上げるテキストを入力"
+      aria-label="読み上げるテキスト"
+    />
+    <button id="speak">読み上げ開始</button>
+
+    <script>
+      (function () {
+        const input = document.getElementById("text");
+        const btn = document.getElementById("speak");
+
+        if (
+          !("speechSynthesis" in window) ||
+          typeof SpeechSynthesisUtterance === "undefined"
+        ) {
+          btn.disabled = true;
+          btn.textContent = "このブラウザは音声合成に対応していません。";
+          return;
+        }
+
+        let voices = [];
+        const loadVoices = () => {
+          voices = window.speechSynthesis.getVoices();
+        };
+        loadVoices();
+        if ("onvoiceschanged" in window.speechSynthesis) {
+          window.speechSynthesis.onvoiceschanged = loadVoices;
+        }
+
+        btn.addEventListener("click", () => {
+          const text = input.value.trim();
+          if (!text) return;
+
+          // 進行中の読み上げがあれば停止してから再生
+          window.speechSynthesis.cancel();
+
+          const u = new SpeechSynthesisUtterance(text);
+
+          // 日本語ボイスを優先
+          const preferred =
+            document.documentElement.lang || navigator.language || "ja-JP";
+          let chosen = voices.find((v) => v.lang && v.lang.startsWith("ja"));
+          if (!chosen) {
+            const base = preferred.split("-")[0];
+            chosen = voices.find((v) => v.lang && v.lang.startsWith(base));
+          }
+          if (chosen) {
+            u.voice = chosen;
+            u.lang = chosen.lang;
+          } else {
+            u.lang = preferred || "ja-JP";
+          }
+
+          u.rate = 1; // 速度
+          u.pitch = 1; // ピッチ
+
+          window.speechSynthesis.speak(u);
+        });
+      })();
+    </script>
+  </body>
+</html>
