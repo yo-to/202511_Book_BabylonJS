@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <title>Babylon.js × Web Speech API</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <style>
+      html,
+      body,
+      #renderCanvas {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background: #000;
+      }
+    </style>
+  </head>
+  <body>
+    <button id="mic" title="音声認識を開始">話す</button>
+    <canvas id="renderCanvas"></canvas>
+
+    <script>
+      // ベース： https://doc.babylonjs.com/setup/templates/basicTemplates/basicJSPG/
+      (async () => {
+        const canvas = document.getElementById("renderCanvas");
+        const engine = new BABYLON.Engine(canvas, true);
+        const scene = new BABYLON.Scene(engine);
+
+        const camera = new BABYLON.FreeCamera(
+          "camera1",
+          new BABYLON.Vector3(0, 5, -10),
+          scene
+        );
+        camera.setTarget(BABYLON.Vector3.Zero());
+        camera.attachControl(canvas, true);
+        const light = new BABYLON.HemisphericLight(
+          "light",
+          new BABYLON.Vector3(0, 1, 0),
+          scene
+        );
+        light.intensity = 0.7;
+        const sphere = BABYLON.MeshBuilder.CreateSphere(
+          "sphere",
+          { diameter: 2, segments: 32 },
+          scene
+        );
+        sphere.position.y = 1;
+
+        const ground = BABYLON.MeshBuilder.CreateGround(
+          "ground",
+          { width: 6, height: 6 },
+          scene
+        );
+
+        engine.runRenderLoop(() => scene.render());
+        addEventListener("resize", () => engine.resize());
+      })();
+
+      // ===== 音声認識（「こんにちは」を含む→「こんにちは」と返す） =====
+      const micBtn = document.getElementById("mic");
+      micBtn.addEventListener("click", () => {
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SR) {
+          alert("このブラウザは音声認識に未対応です。");
+          return;
+        }
+
+        const rec = new SR();
+        rec.lang = "ja-JP";
+        micBtn.classList.add("listening");
+        micBtn.disabled = true;
+
+        rec.onresult = (e) => {
+          let text = "";
+          for (let i = e.resultIndex; i < e.results.length; i++) {
+            text += e.results[i][0].transcript;
+          }
+          text = text.trim();
+
+          // 「こんにちは」を含む場合のみ応答
+          if (text.includes("こんにちは")) {
+            const reply = "こんにちは";
+            if ("speechSynthesis" in window) {
+              const u = new SpeechSynthesisUtterance(reply);
+              u.lang = "ja-JP";
+              speechSynthesis.speak(u);
+            } else {
+              alert(reply);
+            }
+          }
+        };
+
+        rec.onend = () => {
+          micBtn.classList.remove("listening");
+          micBtn.disabled = false;
+        };
+        rec.onerror = () => rec.onend();
+
+        rec.start(); // 1回分の発話を聞いて終了
+      });
+    </script>
+  </body>
+</html>
