@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Web Speech API 音声認識</title>
+  </head>
+  <body>
+    <button id="startBtn">音声認識を開始</button>
+    <pre id="output" aria-live="polite"></pre>
+
+    <script>
+      (() => {
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const btn = document.getElementById("startBtn");
+        const out = document.getElementById("output");
+
+        if (!SR) {
+          btn.disabled = true;
+          out.textContent =
+            "このブラウザは Web Speech API（音声認識）に対応していません。";
+          return;
+        }
+
+        // 初回のみ getUserMedia でマイク権限を取得
+        let micPrimed = false;
+        async function ensureMicPermission() {
+          if (micPrimed) return true;
+          if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia)
+            return true;
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+              audio: true,
+            });
+            // 権限取得後は占有を避けるため停止
+            stream.getTracks().forEach((t) => t.stop());
+            micPrimed = true;
+            return true;
+          } catch (err) {
+            out.textContent =
+              "マイクの許可が必要です: " + (err && err.name ? err.name : err);
+            return false;
+          }
+        }
+
+        const recog = new SR();
+        recog.lang = "ja-JP";
+        recog.interimResults = true;
+        recog.continuous = false;
+
+        recog.onstart = () => {
+          btn.disabled = true;
+          btn.textContent = "認識中…";
+          out.textContent = "";
+        };
+
+        recog.onresult = (e) => {
+          let finalText = "";
+          let interim = "";
+          for (let i = e.resultIndex; i < e.results.length; i++) {
+            const t = e.results[i][0].transcript;
+            if (e.results[i].isFinal) finalText += t;
+            else interim += t;
+          }
+          out.textContent =
+            (finalText ? "確定: " + finalText + "\n" : "") +
+            (interim ? "途中: " + interim : "");
+        };
+
+        recog.onerror = (e) => {
+          out.textContent = "エラー: " + e.error;
+        };
+
+        recog.onend = () => {
+          btn.disabled = false;
+          btn.textContent = "音声認識を開始";
+        };
+
+        btn.addEventListener("click", async () => {
+          btn.disabled = true;
+          const ok = await ensureMicPermission();
+          if (!ok) {
+            btn.disabled = false;
+            return;
+          }
+          try {
+            recog.start();
+          } catch {
+            // 連続クリックなどで start() が二重に呼ばれた場合の保護
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>
